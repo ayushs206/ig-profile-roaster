@@ -43,10 +43,12 @@ app.get('/api/scrap', async (req, res) => {
             const analyzedData = analyzeProfile(processedData);
             const roast = generateRoast(processedData, analyzedData);
 
-            // fs.writeFileSync(path.join(process.cwd(), `scrapedData_${username}.json`), JSON.stringify(responseData, null, 2));
-
-            console.log(roast);
-            return res.status(200).json(roast);
+            return res.status(200).json({
+                success: true,
+                profile: processedData,
+                analysis: analyzedData,
+                roast
+            });
         } catch (error) {
             console.error(error);
             return res.status(500).json({ error: 'An error occurred while scraping the Instagram profile.' });
