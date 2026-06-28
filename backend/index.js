@@ -13,6 +13,17 @@ import path from "path";
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }))
 
+// Enable CORS for frontend requests
+app.use((req, res, next) => {
+    res.header("Access-Control-Allow-Origin", "*");
+    res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+    res.header("Access-Control-Allow-Methods", "GET, OPTIONS");
+    if (req.method === 'OPTIONS') {
+        return res.sendStatus(200);
+    }
+    next();
+});
+
 import processProfile from "./functions/processProfile.js";
 import analyzeProfile from "./functions/analyzeProfile.js";
 import generateRoast from "./functions/generateRoast.js";
@@ -56,6 +67,30 @@ app.get('/api/scrap', async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'An error occurred while scraping the Instagram profile.' });
+    }
+});
+
+app.get('/api/proxy-image', async (req, res) => {
+    try {
+        const imageUrl = req.query.url;
+        if (!imageUrl) {
+            return res.status(400).send('Image URL is required');
+        }
+
+        const response = await axios.get(imageUrl, {
+            responseType: 'stream',
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36',
+                'Referer': 'https://www.instagram.com/'
+            }
+        });
+
+        res.setHeader('Content-Type', response.headers['content-type'] || 'image/jpeg');
+        res.setHeader('Cache-Control', 'public, max-age=86400');
+        response.data.pipe(res);
+    } catch (error) {
+        console.error('Error proxying image:', error.message);
+        res.status(500).send('Error loading image');
     }
 });
 

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { motion, AnimatePresence } from "motion/react";
-import { CheckCircle2, Terminal } from "lucide-react";
+import { Terminal } from "lucide-react";
 
 const funnyMessages = [
   "Looking at profile...",
@@ -25,44 +25,123 @@ export function LoadingPage() {
   const [messageIndex, setMessageIndex] = useState(0);
   const [progress, setProgress] = useState(0);
   const [logs, setLogs] = useState<string[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const totalTime = 8000; 
-    const intervalTime = totalTime / funnyMessages.length;
-    let currentIdx = 0;
+    let active = true;
+    const cleanUser = user.startsWith("@") ? user.substring(1) : user;
+    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
 
-    const interval = setInterval(() => {
-      currentIdx++;
-      if (currentIdx < funnyMessages.length) {
-        setMessageIndex(currentIdx);
-      }
-    }, intervalTime);
-
+    // Progress tick: smoothly increment up to 90%
     const progressInterval = setInterval(() => {
       setProgress(p => {
-        if (p >= 100) {
+        if (p >= 90) {
           clearInterval(progressInterval);
-          return 100;
+          return 90;
         }
         return p + 2;
       });
-    }, totalTime / 50);
+    }, 150);
 
-    const timeouts = [
-      setTimeout(() => setLogs(l => [...l, "✓ Username found"]), 1000),
-      setTimeout(() => setLogs(l => [...l, "✓ Profile scanned"]), 2500),
-      setTimeout(() => setLogs(l => [...l, "✓ Captions questionable"]), 4000),
-      setTimeout(() => setLogs(l => [...l, "✓ Roast quality: Excellent"]), 5500),
-      setTimeout(() => setLogs(l => [...l, "✓ Emotional damage ready"]), 7000),
-      setTimeout(() => navigate(`/results?user=${encodeURIComponent(user)}`), 8500),
+    // Funny messages rotation
+    const messageInterval = setInterval(() => {
+      setMessageIndex(prev => (prev + 1) % funnyMessages.length);
+    }, 1000);
+
+    // Logs addition simulation
+    const logsSequence = [
+      "Connecting to Instagram servers...",
+      "Scraping user profile details...",
+      "Analyzing bio metadata...",
+      "Reading caption sentiments...",
+      "Consulting the hater algorithm...",
+      "Compiling emotional damage..."
     ];
+    let logIdx = 0;
+    const logInterval = setInterval(() => {
+      if (logIdx < logsSequence.length) {
+        setLogs(l => [...l, `✓ ${logsSequence[logIdx]}`]);
+        logIdx++;
+      } else {
+        clearInterval(logInterval);
+      }
+    }, 1000);
+
+    // Fetch the roast from the backend
+    fetch(`${apiBaseUrl}/api/scrap?username=${encodeURIComponent(cleanUser)}`)
+      .then(async res => {
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || `HTTP error! status: ${res.status}`);
+        }
+        return res.json();
+      })
+      .then(data => {
+        if (!active) return;
+        if (data.success) {
+          clearInterval(progressInterval);
+          clearInterval(messageInterval);
+          clearInterval(logInterval);
+          
+          setLogs(l => [...l, "✓ Analysis completed!", "✓ Roast successfully cooked!"]);
+          setProgress(100);
+
+          // Save in session storage for persistence on refresh
+          sessionStorage.setItem(`roast_${user}`, JSON.stringify(data));
+          
+          // Small delay for smooth transition after reaching 100%
+          setTimeout(() => {
+            if (active) {
+              navigate(`/results?user=${encodeURIComponent(user)}`, { state: { data } });
+            }
+          }, 800);
+        } else {
+          throw new Error("Failed to process profile data.");
+        }
+      })
+      .catch(err => {
+        if (!active) return;
+        clearInterval(progressInterval);
+        clearInterval(messageInterval);
+        clearInterval(logInterval);
+        setError(err.message || "Failed to fetch profile. Make sure the username is correct, public, and the backend is running.");
+      });
 
     return () => {
-      clearInterval(interval);
+      active = false;
       clearInterval(progressInterval);
-      timeouts.forEach(clearTimeout);
+      clearInterval(messageInterval);
+      clearInterval(logInterval);
     };
-  }, [navigate, user]);
+  }, [user, navigate]);
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-[clamp(1rem,4vw,2rem)] relative">
+        <div className="brutal-card p-[clamp(1.5rem,4vw,3rem)] w-[90%] md:w-full max-w-2xl bg-white flex flex-col gap-6 relative z-10 border-red-500">
+          <div className="absolute -top-4 -right-2 md:-right-4 sticker bg-[#FF3B30] text-white text-[clamp(0.6rem,2vw,0.8rem)]">ERROR</div>
+          
+          <h2 className="font-bebas text-[clamp(2rem,6vw,3rem)] uppercase text-center text-red-600 drop-shadow-[2px_2px_0_#FFF] leading-tight">
+            DIAGNOSTIC CRASHED
+          </h2>
+
+          <div className="border-4 border-black bg-[#FFF5F5] p-5 shadow-[4px_4px_0_#111]">
+            <p className="font-bold text-lg mb-2 text-red-600">Failed to roast {user}:</p>
+            <p className="font-space text-sm text-gray-800 break-words">{error}</p>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-3 w-full">
+            <button onClick={() => navigate("/")} className="brutal-button w-full py-3 flex items-center justify-center gap-2 bg-[#FF8FC4] font-bold cursor-pointer">
+              Go Back Home
+            </button>
+            <button onClick={() => window.location.reload()} className="brutal-button w-full py-3 flex items-center justify-center gap-2 bg-[#EADCFB] font-bold cursor-pointer">
+              Retry Scan
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center p-[clamp(1rem,4vw,2rem)] relative">
