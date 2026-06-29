@@ -2,8 +2,8 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import express from "express";
+import serverless from "serverless-http";
 import axios from "axios";
-import * as cheerio from "cheerio";
 
 const app = express();
 
@@ -94,6 +94,8 @@ app.get('/api/proxy-image', async (req, res) => {
     }
 });
 
-app.listen(process.env.BACKEND_PORT || 3000, () => {
-    console.log(`Server is running on port ${process.env.BACKEND_PORT || 3000}`);
-});
+// app.listen(process.env.BACKEND_PORT || 3000, () => {
+//     console.log(`Server is running on port ${process.env.BACKEND_PORT || 3000}`);
+// });
+
+export const handler = serverless(app);
